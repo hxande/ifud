@@ -1,0 +1,154 @@
+version: '3.8'
+services:
+   postgres_cadastro:
+      container_name: postgres_cadastro_ifud
+      image: debezium/example-postgres
+      environment:
+         POSTGRES_USER: cadastro
+         POSTGRES_PASSWORD: cadastro
+      ports:
+         - 5432:5432
+         
+   postgres_marketplace:
+      container_name: postgres_marketplace_ifud
+      image: postgres:12.2
+      environment:
+         POSTGRES_USER: marketplace
+         POSTGRES_PASSWORD: marketplace
+      ports:
+         - 5433:5432
+         
+   keycloak_ifud:
+      container_name: keycloak_ifud
+      image: jboss/keycloak:9.0.2
+      environment:
+         KEYCLOAK_USER: admin
+         KEYCLOAK_PASSWORD: admin
+      ports:
+         - 8180:8080
+         
+   jaeger_ifud:
+      container_name: jaeger_ifud
+      image: jaegertracing/all-in-one:1.17
+      ports:
+         - 5775:5775/udp
+         - 6831:6831/udp
+         - 6832:6832/udp
+         - 5778:5778
+         - 16686:16686
+         - 14268:14268
+         - 14250:14250
+         - 9411:9411
+         
+   prometheus_ifud:
+      container_name: prometheus_ifud
+      image: prometheus-ifud
+      ports:
+         - 9090:9090
+         
+   grafana_ifud:
+      container_name: grafana_ifud
+      image: grafana/grafana:6.5.0
+      ports:
+         - 3000:3000
+         
+   artemis_ifud:
+      container_name: artemis_ifud
+      image: vromero/activemq-artemis:2.11.0
+      ports:
+         - 8161:8161
+         - 5672:5672
+      environment:
+         ARTEMIS_USERNAME: admin
+         ARTEMIS_PASSWORD: admin
+         
+   mongodb_ifud:
+      container_name: mongodb_ifud
+      image: mongo:4.2.6-bionic
+      ports:
+         - 27017:27017
+      environment:
+         MONGO_INITDB_ROOT_USERNAME: pedido
+         MONGO_INITDB_ROOT_PASSWORD: pedido
+         MONGO_INITDB_DATABASE: pedido
+         
+   zookeeper:
+      container_name: zookeeper_container
+      image: debezium/zookeeper:1.1
+      ports:
+         - 2181:2181
+         - 2888:2888
+         - 3888:3888
+    
+   kafka:
+      container_name: kafka_container
+      image: debezium/kafka:1.1
+      ports:
+         - 9092:9092
+      environment:
+         ZOOKEEPER_CONNECT: zookeeper:2181
+         ADVERTISED_HOST_NAME: kafka
+
+   kafdrop:
+      container_name: kafdrop_container
+      image: obsidiandynamics/kafdrop:3.24.0
+      ports:
+         - 9000:9000
+      environment:
+         KAFKA_BROKERCONNECT: kafka:9092
+      depends_on:
+         - kafka
+         
+   elasticsearch:
+      container_name: elasticsearch
+      image: docker.elastic.co/elasticsearch/elasticsearch:7.6.2
+      ports:
+         - 9200:9200
+      environment:
+         - node.name=es01
+         - cluster.name=es-docker-cluster
+         - cluster.initial_master_nodes=es01
+         - bootstrap.memory_lock=true
+         - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      ulimits:
+         memlock:
+            soft: -1
+            hard: -1
+
+   kibana:
+      container_name: kibana
+      image: docker.elastic.co/kibana/kibana:7.6.2
+      ports:
+         - 5601:5601
+      environment:
+         ELASTICSEARCH_HOST: elasticsearch
+         ELASTICSEARCH_URL: http://192.168.0.15:9200
+         
+   logstash:
+      container_name: logstash
+      image: docker.elastic.co/logstash/logstash-oss:6.8.2
+      volumes:
+         - source: ./pipelines
+           target: /usr/share/logstash/pipeline
+           type: bind
+      depends_on:
+         - elasticsearch
+         
+   connect:
+      container_name: connect
+      image: debezium/connect:1.1
+      environment:
+         - BOOTSTRAP_SERVERS=kafka:9092
+         - GROUP_ID=1
+         - CONFIG_STORAGE_TOPIC=my_connect_configs
+         - OFFSET_STORAGE_TOPIC=my_connect_offsets
+         - STATUS_STORAGE_TOPIC=my_connect_statuses
+      ports:
+         - 8083:8083
+      links:
+         - kafka
+         - postgres_cadastro
+      depends_on:
+         - kafka
+         - zookeeper
+         - postgres_cadastro
