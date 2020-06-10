@@ -1,1 +1,1 @@
-web: java -Dquarkus.http.port=$PORT $JAVA_OPTS -jar $JAR_FILE
+web: java -Dquarkus.http.port=$PORT $JAVA_OPTS -jar $PATH_TO_JAR
